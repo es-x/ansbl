@@ -1,0 +1,10 @@
+---
+- name: show return value of command module
+  hosts: web
+  tasks:
+    - name: capture output of id command
+      command: id -un
+      register: login
+      ignore_errors: True
+    - debug: var=login 
+    - debug: msg="Logged in as user {{ login.stdout }}"

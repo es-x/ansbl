@@ -1,0 +1,130 @@
+---
+- name: vars
+	hosts: web
+	vars:
+		user: "{{ ansible_user }}"
+		proj_app: mezzanine_example
+		proj_name: "{{ proj_app }}"
+		venv_home: "{{ ansible_env.HOME }}/.virtualenvs"
+		venv_path: "{{ venv_home }}/{{ proj_name }}"
+		proj_path: "{{ ansible_env.HOME }}/mezzanine/{{ proj_name }}"
+		settings_path: "{{ proj_path }}/{{ proj_name }}"
+		reqs_path: requirements.txt
+		manage: "{{ python }} {{ proj_path }}/manage.py"
+		live_hostname: "{{ ansible_eth0.ipv4.address }}.xip.io"
+		domains: 
+			- "{{ ansible_eth0.ipv4.address }}.xip.io"
+			- "www.{{ ansible_eth0.ipv4.address }}.xip.io"
+		repo_url: git@github.com/ansiblebook/mezzanine_example.git
+		locale: en_US.UTF-8
+		conf_path: /etc/nginx/conf.d
+		tls_enabled: True
+		python: "{{ venv_path }}/bin/python"
+		database_name: "{{ proj_name }}"
+		database_user: "{{ proj_name }}"
+		database_host: localhost
+		database_port: 5432
+		gunicorn_procname: gunicorn_mezzanine
+		num_workers: "multiprocessing.cpu_count() * 2 + 1"
+	vars_files:
+		- secrets.yml
+	tasks:
+		- name: add nginx repo
+      yum_repository:
+        name: nginx
+        description: nginx repo
+        file: nginx
+        baseurl: http://nginx.org/packages/centos/7/$basearch/
+        gpgcheck: no
+        enabled: yes
+      become: True
+    - name: install epel
+      yum: name=epel-release state=latest update_cache=yes
+      become: True
+
+		- name: install yum packages
+			yum: name={{ item }} state=latest update_cache=yes 
+			become: True
+			with_items:
+				- git
+				- vim
+				- libjpeg-turbo-devel
+				- libpqxx-devel
+				- memcached
+				- nginx
+				- postgresql-server
+				- python-devel
+				- python2-pip
+				- python-psycopg2
+				- python-setuptools
+				- python-virtualenv
+				- supervisor
+		- name: create project path
+			file: path={{ proj_path }} state=directory
+		- name: create a logs directory
+			file:
+				path: "{{ ansible_env.HOME }}/logs"
+				state: directory
+		- name: check out the repository on the host
+			git: repo={{ repo_url }} dest={{ proj_path }} accept_hostkey=yes
+		- name: install python requirements globally via pip
+			pip: name={{ item }} state=latest
+			with_items:
+				- pip
+				- virtualenv
+				- virtualenvwrapper
+			become: True
+
+		- name: create project locale
+			locale_gen: name={{ locale }}
+			become: True
+		- name: create DB user
+			postgresql_user:
+				name: "{{ database_user }}"
+				password: "{{ db_pass }}"
+				become:	True
+				become_user: posgres
+		- name: create data base
+			postgresql_db: 
+				name: "{{ database_name}}"
+				owner: "{{ database_user }}"
+				encoding: UTF8
+				lc_ctype: "{{ locale }}"
+				lc_collate: "{{ locale }}"
+				template: template0
+			become: True
+			become_user: posgres
+
+		- name: ensure conf_path exist
+			file:	path={{ conf_path }} state=latest
+			become: True
+		- name: create tls_sertificate
+			command: >
+				openssl req -new -x509 -nodes -out {{ proj_name }}.crt
+        -keyout {{ proj_name }}.key -subj '/CN={{ domains[0] }}' -days 3650
+        #перейти в папку
+        chdir={{ conf_path }}
+        #обеспечение идемпотентность проверяет есть фал или нет
+        creates={{ conf_path }}/{{ proj_name }}.crt
+      become: True
+      when: tls_enabled
+      notify: restart nginx
+
+    - name: remove nginx default.conf
+    	file: path={{ conf_path }}/default.conf state=absent
+    	notify: restart nginx
+    	become: True
+
+    - name: set the nginx config file
+    	template: src=/template/nginx_ch6.conf.j2 dst={{ conf_path }}/mezzanine.conf
+    	notify: restart nginx
+    	become: True
+    	
+
+
+
+
+		
+
+
+
