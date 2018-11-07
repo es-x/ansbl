@@ -1,0 +1,13 @@
+[Unit]
+Description=gunicorn daemon
+Requires=gunicorn.socket
+After=network.target
+[Service]
+User=vagrant
+Group=nginx
+WorkingDirectory={{ proj_path }}
+ExecStart={{ venv_path }}/bin/gunicorn \
+-c "{{ proj_path }}/gunicorn.conf.py" \
+{{ proj_app }}.wsgi:application
+[Install]
+WantedBy=multi-user.target

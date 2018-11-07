@@ -1,5 +1,5 @@
 upstream {{ proj_name }} {
-    server unix:{{ proj_path }}/gunicorn.sock fail_timeout=0;
+    server unix:{{ gunicorn_socket }} fail_timeout=0;
 }
 
 server {
@@ -14,8 +14,8 @@ server {
     keepalive_timeout    15;
 
     {% if tls_enabled %}
-    ssl_certificate      conf/{{ proj_name }}.crt;
-    ssl_certificate_key  conf/{{ proj_name }}.key;
+    ssl_certificate      conf.d/{{ proj_name }}.crt;
+    ssl_certificate_key  conf.d/{{ proj_name }}.key;
     ssl_session_cache    shared:SSL:10m;
     ssl_session_timeout  10m;
     ssl_ciphers CDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA;
@@ -28,7 +28,7 @@ server {
         proxy_set_header    X-Real-IP               $remote_addr;
         proxy_set_header    X-Forwarded-For         $proxy_add_x_forwarded_for;
         proxy_set_header    X-Forwarded-Protocol    $scheme;
-        proxy_pass          http://{{ proj_name }};
+        proxy_pass          http://unix:{{ gunicorn_socket }};
     }
 
     location /static/ {
