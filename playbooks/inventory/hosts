@@ -1,6 +1,6 @@
 [c7study]
-c7study1 ansible_host=127.0.0.1 ansible_port=2200
-c7study2 ansible_host=127.0.0.1 ansible_port=2222 
+c7study1 ansible_host=127.0.0.1 ansible_port=2222
+c7study2 ansible_host=127.0.0.1 ansible_port=2200 
 c7study3 ansible_host=127.0.0.1 ansible_port=2201
 
 [production]

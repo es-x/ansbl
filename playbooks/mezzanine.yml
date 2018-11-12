@@ -1,38 +1,35 @@
 ---
 - name: vars
-  hosts: web
-  vars:
-    user: "{{ ansible_user }}"
-    proj_app: mezzanine_example
-    proj_name: "{{ proj_app }}"
-    venv_home: "{{ ansible_env.HOME }}/.virtualenvs"
-    venv_path: "{{ venv_home }}/{{ proj_name }}"
-    proj_path: "{{ ansible_env.HOME }}/mezzanine/{{ proj_name }}"
-    settings_path: "{{ proj_path }}/{{ proj_name }}"
-    reqs_path: requirements.txt
-    manage: "{{ python }} {{ proj_path }}/manage.py"
-    live_hostname: "{{ ansible_eth1.ipv4.address }}.xip.io"
-    domains: 
-      - "{{ ansible_eth1.ipv4.address }}.xip.io"
-      - "www.{{ ansible_eth1.ipv4.address }}.xip.io"
-    repo_url: https://github.com/es-x/mezzanine.git
-    locale: en_US.UTF-8
-    conf_path: /etc/nginx/conf.d
-    tls_enabled: True
-    python: "{{ venv_path }}/bin/python"
-    database_name: "{{ proj_name }}"
-    database_user: "{{ proj_name }}"
-    database_host: localhost
-    database_port: 5432
-    postgres_data: /var/lib/pgsql/data
-    gunicorn_procname: gunicorn_mezzanine
-    gunicorn_socket: /run/gunicorn.sock
-    num_workers: "multiprocessing.cpu_count() * 2 + 1"
-    systemctl_path: /etc/systemd/system
-  vars_files:
-    - secrets.yml
-  tasks:
-    - name: add nginx repo
+	hosts: web
+	vars:
+		user: "{{ ansible_user }}"
+		proj_app: mezzanine_example
+		proj_name: "{{ proj_app }}"
+		venv_home: "{{ ansible_env.HOME }}/.virtualenvs"
+		venv_path: "{{ venv_home }}/{{ proj_name }}"
+		proj_path: "{{ ansible_env.HOME }}/mezzanine/{{ proj_name }}"
+		settings_path: "{{ proj_path }}/{{ proj_name }}"
+		reqs_path: requirements.txt
+		manage: "{{ python }} {{ proj_path }}/manage.py"
+		live_hostname: "{{ ansible_eth0.ipv4.address }}.xip.io"
+		domains: 
+			- "{{ ansible_eth0.ipv4.address }}.xip.io"
+			- "www.{{ ansible_eth0.ipv4.address }}.xip.io"
+		repo_url: git@github.com/ansiblebook/mezzanine_example.git
+		locale: en_US.UTF-8
+		conf_path: /etc/nginx/conf.d
+		tls_enabled: True
+		python: "{{ venv_path }}/bin/python"
+		database_name: "{{ proj_name }}"
+		database_user: "{{ proj_name }}"
+		database_host: localhost
+		database_port: 5432
+		gunicorn_procname: gunicorn_mezzanine
+		num_workers: "multiprocessing.cpu_count() * 2 + 1"
+	vars_files:
+		- secrets.yml
+	tasks:
+		- name: add nginx repo
       yum_repository:
         name: nginx
         description: nginx repo
@@ -45,224 +42,89 @@
       yum: name=epel-release state=latest update_cache=yes
       become: True
 
-    - name: install yum packages
-      yum: name={{ item }} state=latest update_cache=yes 
-      become: True
-      with_items:
-        - git
-        - vim
-        - libjpeg-turbo-devel
-        - libpqxx-devel
-        - memcached
-        - nginx
-        - postgresql-server
-        - python-devel
-        - python2-pip
-        - python-psycopg2
-        - python-setuptools
-        - python-virtualenv
-        - supervisor
-        - gcc
-        - net-tools
-        - libsemanage-python
-    - name: create project path
-      file: path={{ proj_path }} state=directory
-    - name: create a logs directory
-      file:
-        path: "{{ ansible_env.HOME }}/logs"
-        state: directory
-    - name: check out the repository on the host
-      git: repo={{ repo_url }} dest={{ proj_path }} accept_hostkey=yes
+		- name: install yum packages
+			yum: name={{ item }} state=latest update_cache=yes 
+			become: True
+			with_items:
+				- git
+				- vim
+				- libjpeg-turbo-devel
+				- libpqxx-devel
+				- memcached
+				- nginx
+				- postgresql-server
+				- python-devel
+				- python2-pip
+				- python-psycopg2
+				- python-setuptools
+				- python-virtualenv
+				- supervisor
+		- name: create project path
+			file: path={{ proj_path }} state=directory
+		- name: create a logs directory
+			file:
+				path: "{{ ansible_env.HOME }}/logs"
+				state: directory
+		- name: check out the repository on the host
+			git: repo={{ repo_url }} dest={{ proj_path }} accept_hostkey=yes
+		- name: install python requirements globally via pip
+			pip: name={{ item }} state=latest
+			with_items:
+				- pip
+				- virtualenv
+				- virtualenvwrapper
+			become: True
 
-    - name: install python requirements globally via pip
-      pip: name={{ item }} state=latest
-      with_items:
-        - pip
-        - virtualenv
-        - virtualenvwrapper
-      become: True
+		- name: create project locale
+			locale_gen: name={{ locale }}
+			become: True
+		- name: create DB user
+			postgresql_user:
+				name: "{{ database_user }}"
+				password: "{{ db_pass }}"
+				become:	True
+				become_user: posgres
+		- name: create data base
+			postgresql_db: 
+				name: "{{ database_name}}"
+				owner: "{{ database_user }}"
+				encoding: UTF8
+				lc_ctype: "{{ locale }}"
+				lc_collate: "{{ locale }}"
+				template: template0
+			become: True
+			become_user: posgres
 
-    - name: postgre init db
-      command: /usr/bin/postgresql-setup initdb
-        creates=/var/lib/pgsql/data/pg_hba.conf
-      become: True
-      become_user: postgres
-    
-    - name: enable and start postgresql-server
-      service: name=postgresql state=started enabled=yes
-      become: True
-
-    # - name: enable and start supervisord
-    #   service: name=supervisord state=started enabled=yes
-    #   become: True
-
-    - name: create project locale
-      # locale_gen: name={{ locale }} state=present
-      command: localedef -c -i en_US -f UTF-8 {{ locale }}
-      become: True
-    - name: create DB user
-      postgresql_user:
-        name: "{{ database_user }}"
-        password: "{{ db_pass }}"
-      become: True
-      become_user: postgres
-
-    - name: create data base
-      postgresql_db: 
-        name: "{{ database_name}}"
-        owner: "{{ database_user }}"
-        encoding: UTF8
-        lc_ctype: "{{ locale }}"
-        lc_collate: "{{ locale }}"
-        template: template0
-      become: True
-      become_user: postgres
-
-    - name: ensure conf_path exist
-      file: path={{ conf_path }} state=directory
-      become: True
-    - name: create tls_sertificate
-      command: >
-        openssl req -new -x509 -nodes -out {{ proj_name }}.crt
+		- name: ensure conf_path exist
+			file:	path={{ conf_path }} state=latest
+			become: True
+		- name: create tls_sertificate
+			command: >
+				openssl req -new -x509 -nodes -out {{ proj_name }}.crt
         -keyout {{ proj_name }}.key -subj '/CN={{ domains[0] }}' -days 3650
+        #перейти в папку
         chdir={{ conf_path }}
+        #обеспечение идемпотентность проверяет есть фал или нет
         creates={{ conf_path }}/{{ proj_name }}.crt
       become: True
       when: tls_enabled
       notify: restart nginx
 
     - name: remove nginx default.conf
-      file: path={{ conf_path }}/default.conf state=absent
-      notify: restart nginx
-      become: True
+    	file: path={{ conf_path }}/default.conf state=absent
+    	notify: restart nginx
+    	become: True
 
     - name: set the nginx config file
-      template: src=templates/nginx_ch6.conf.j2 dest={{ conf_path }}/mezzanine.conf
-      notify: restart nginx
-      become: True
-
-    # - name: set the supervisor config file
-    #   template: src=templates/supervisor.conf.j2 dest=/etc/supervisord.d/mezzanine.ini
-    #   become: True
-    #   notify: restart supervisor
-      
-    - name: set the gunicorn config file
-      template: src=templates/gunicorn.conf.py.j2 dest={{ proj_path }}/gunicorn.conf.py
-    
-    - name: generate the settings file
-      template: src=templates/local_settings.py.j2 dest={{ settings_path }}/local_settings.py
-
-    - name: set the pg_hba conf file
-      template: src=templates/pg_hba.conf.j2 dest={{ postgres_data }}/pg_hba.conf 
-      become: True
-      notify: restart postgresql-server 
-
-    # - name: set sepolicy for gunicorn
-    #   template: src=templates/nginx_gunicorn.sock.pp dest={{ ansible_env.HOME}}/nginx_gunicorn.sock.pp
-    #   become: True
-
-    - name: set sepolicy for gunicorn
-      copy: src=templates/nginx_gunicorn.sock.pp dest={{ ansible_env.HOME}}/nginx_gunicorn.sock.pp
-      become: True
-
-    - name: apply SE policy
-      command: semodule -i {{ ansible_env.HOME}}/nginx_gunicorn.sock.pp
-      become: True
-
-    - name: set httpd_read_user_content
-      seboolean: name=httpd_read_user_content state=yes persistent=yes
-      become: True
-
-    - name: set chmod for HOME
-      file: path={{ ansible_env.HOME }} state=directory mode=0755
-      become: True
-       
-    - name: set systemctl gunicorn.sock
-      template: src=templates/gunicorn.socket.j2 dest={{ systemctl_path }}/gunicorn.socket
-      become: True
-      notify: start and enabled gunicorn service
-
-    - name: set systemctl gunicorn.service
-      template: src=templates/gunicorn.service.j2 dest={{ systemctl_path }}/gunicorn.service
-      become: True
-      notify: start and enabled gunicorn service
-    
-    # - name: just force systemd to reread configs (2.4 and above)
-    #   systemd: daemon_reload=yes
-    #   become: True
-      
-    # - name: set the postgresql.conf file
-    #   template: src=templates/postgresql.conf.j2 dest={{ postgres_data }}/postgresql.conf owner=postgres group=postgres mode=0600
-    #   become: True
-    #   notify: restart postgresql-server   
-    
-    - name: set the postgresql.conf file
-      template:
-        src: templates/postgresql.conf.j2
-        dest: "{{ postgres_data }}/postgresql.conf"
-        owner: postgres
-        group: postgres
-        mode: 0600
-      become: True
-      notify: restart postgresql-server
-
-    - name: install requirements.txt
-      pip: requirements={{ proj_path }}/{{ reqs_path }} virtualenv={{ venv_path }}
-    
-    - name: install required python packages
-      pip: name={{ item }} virtualenv={{ venv_path }}
-      with_items:
-        - gunicorn
-        - setproctitle
-        - psycopg2-binary
-        - django-compressor
-        - python-memcached
-
-    - name: restart posdtgresql
-      service: name=postgresql state=restarted
-      become: True     
-
-    - name: apply migrations to create the database, collect static content
-      django_manage:
-        command: "{{ item }}"
-        app_path: "{{ proj_path }}"
-        virtualenv: "{{ venv_path }}"
-      with_items:
-        - migrate
-        - collectstatic
-      
-   
-    - name: set the site id
-      script: scripts/setsite.py
-      environment:
-        PATH: "{{ venv_path }}/bin"
-        PROJECT_DIR: "{{ proj_path }}"
-        PROJECT_APP: "{{ proj_app }}"
-        WEBSITE_DOMAIN: "{{ live_hostname }}"
-    - name: set the admin password
-      script: scripts/setadmin.py
-      environment:
-        PATH: "{{ venv_path }}/bin"
-        PROJECT_DIR: "{{ proj_path }}"
-        PROJECT_APP: "{{ proj_app }}"
-        ADMIN_PASSWORD: "{{ admin_pass }}"
-  
-  handlers:
-    - name: start and enabled gunicorn service
-      systemd: state=restarted daemon_reload=yes enabled=yes name=gunicorn
-      become: True
-    # - name: restart supervisor
-    #   supervisorctl: "name={{ gunicorn_procname }} state=restarted"
-    #   become: True
-    - name: restart nginx
-      service: name=nginx state=restarted
-      become: True
-    - name: restart postgresql-server
-      service: name=postgresql state=restarted
-      become: True
+    	template: src=/template/nginx_ch6.conf.j2 dst={{ conf_path }}/mezzanine.conf
+    	notify: restart nginx
+    	become: True
+    	
 
 
-    
+
+
+		
 
 
 
