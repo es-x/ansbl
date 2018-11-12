@@ -1,0 +1,5 @@
+---
+# handlers file for database
+- name: restart postgresql-server
+  systemd: name=postgresql state=restarted
+  become: True

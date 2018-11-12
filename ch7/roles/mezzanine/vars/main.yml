@@ -1,0 +1,15 @@
+---
+# vars file for mezzanine
+mezzanine_user: "{{ ansible_user }}"
+mezzanine_venv_home: "{{ ansible_env.HOME }}/.virtualenvs"
+mezzanine_venv_path: "{{ mezzanine_venv_home }}/{{ mezzanine_proj_name }}"
+mezzanine_repo_url: https://github.com/es-x/mezzanine.git
+mezzanine_proj_path: "{{ ansible_env.HOME }}/mezzanine/{{ mezzanine_proj_name }}"
+mezzanine_settings_path: "{{ mezzanine_proj_path }}/{{ mezzanine_proj_name }}"
+mezzanine_reqs_path: requirements.txt
+mezzanine_conf_path: /etc/nginx/conf.d
+mezzanine_python: "{{ mezzanine_venv_path }}/bin/python"
+mezzanine_manage: "{{ mezzanine_python }} {{ mezzanine_proj_path }}/manage.py"
+mezzanine_num_workers: "multiprocessing.cpu_count() * 2 + 1"
+mezzanine_gunicorn_socket: /run/gunicorn.sock
+mezzanine_systemctl_path: /etc/systemd/system

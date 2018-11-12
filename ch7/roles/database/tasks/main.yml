@@ -1,0 +1,59 @@
+---
+# tasks file for database
+- name: install epel
+  yum: name=epel-release state=latest update_cache=yes
+  become: True
+
+- name: install yum packages
+  yum: name={{ item }} state=latest update_cache=yes 
+  become: True
+  with_items:
+    - libpqxx-devel
+    - postgresql-server
+    - python-psycopg2
+
+- name: postgre init db
+  command: /usr/bin/postgresql-setup initdb
+    creates=/var/lib/pgsql/data/pg_hba.conf
+  become: True
+  become_user: postgres
+
+- name: create project locale
+  command: localedef -c -i en_US -f UTF-8 {{ locale }}
+  become: True
+
+- name: set the postgresql.conf file
+  copy: >
+    src=postgresql.conf dest="{{ postgres_data }}/postgresql.conf"
+    owner=postgres group=postgres mode=0600
+  become: True
+  notify: restart postgresql-server
+
+- name: set the pg_hba conf file
+  copy: >
+    src=pg_hba.conf dest="{{ postgres_data }}/pg_hba.conf"
+    owner=postgres group=postgres mode=0600 
+  become: True
+  notify: restart postgresql-server 
+
+- name: restart postgresql-server
+  systemd: name=postgresql state=restarted enabled=yes
+  become: True  
+
+- name: create DB user
+  postgresql_user:
+    name: "{{ database_user }}"
+    password: "{{ db_pass }}"
+  become: True
+  become_user: postgres
+
+- name: create data base
+  postgresql_db: 
+    name: "{{ database_name}}"
+    owner: "{{ database_user }}"
+    encoding: UTF8
+    lc_ctype: "{{ locale }}"
+    lc_collate: "{{ locale }}"
+    template: template0
+  become: True
+  become_user: postgres

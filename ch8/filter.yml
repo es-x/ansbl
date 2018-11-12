@@ -1,0 +1,14 @@
+---
+- name: filter
+  hosts: all
+  tasks:
+
+    - name: run prog
+      command: /opt/myprog
+      register: result
+      ignore_errors: True
+
+    - debug: var=result
+
+    - debug: msg="Stop Running tasks playbook if prog failed"
+      failed_when: result|failed

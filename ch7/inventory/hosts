@@ -1,0 +1,22 @@
+[c7study]
+db ansible_host=127.0.0.1 ansible_port=2222
+web ansible_host=127.0.0.1 ansible_port=2200 
+c7study3 ansible_host=127.0.0.1 ansible_port=2201
+
+[production]
+
+[staging]
+
+[lb]
+
+[web]
+web
+
+[task]
+c7study2
+
+[rabbitmq]
+c7study3
+
+[db]
+db

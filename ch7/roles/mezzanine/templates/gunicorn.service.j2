@@ -1,0 +1,13 @@
+[Unit]
+Description=gunicorn daemon
+Requires=gunicorn.socket
+After=network.target
+[Service]
+User=vagrant
+Group=nginx
+WorkingDirectory={{ mezzanine_proj_path }}
+ExecStart={{ mezzanine_venv_path }}/bin/gunicorn \
+-c "{{ mezzanine_proj_path }}/gunicorn.conf.py" \
+{{ mezzanine_proj_app }}.wsgi:application
+[Install]
+WantedBy=multi-user.target

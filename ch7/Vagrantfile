@@ -1,0 +1,34 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  #using ident key for all machines
+  config.ssh.insert_key=false
+
+  config.vm.define "db" do |db|
+  db.vm.box = "centos/7"
+  db.vm.box_check_update = "true"
+  #db.vm.network "forwarded_port", guest: 80, host: 8080
+  #db.vm.network "forwarded_port", guest: 443, host: 8443
+  db.vm.network "private_network", ip: "172.16.99.15"
+  db.vm.provider "virtualbox" do |v|
+    v.name = "db"
+    v.customize ["modifyvm", :id, "--memory", "512"]
+  end
+  end
+  config.vm.define "web" do |web|
+  web.vm.box = "centos/7"
+  web.vm.box_check_update = "true"
+  # web.vm.network "forwarded_port", guest: 80, host: 8081
+  # web.vm.network "forwarded_port", guest: 443, host: 8444
+  web.vm.network "private_network", ip: "172.16.99.14"
+  web.vm.provider "virtualbox" do |v|
+    v.name = "web"
+    v.customize ["modifyvm", :id, "--memory", "512"]
+  end
+  web.vm.provision "ansible" do |ansible|
+      ansible.limit = 'all'
+      ansible.playbook = "mezzanine-accros-hosts.yml"
+    end
+  end
+end

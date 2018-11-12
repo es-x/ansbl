@@ -1,0 +1,52 @@
+- name: ensure conf_path exist
+  file: path={{ mezzanine_conf_path }} state=directory
+  become: True
+
+- name: create tls_sertificate
+  command: >
+    openssl req -new -x509 -nodes -out {{ mezzanine_proj_name }}.crt
+    -keyout {{ mezzanine_proj_name }}.key -subj '/CN={{ domains[0] }}' -days 3650
+    chdir={{ mezzanine_conf_path }}
+    creates={{ mezzanine_conf_path }}/{{ mezzanine_proj_name }}.crt
+  become: True
+  when: tls_enabled
+  notify: restart nginx
+
+- name: remove nginx default.conf
+  file: path={{ mezzanine_conf_path }}/default.conf state=absent
+  notify: restart nginx
+  become: True
+
+- name: set the nginx config file
+  template: src=nginx_ch6.conf.j2 dest={{ mezzanine_conf_path }}/mezzanine.conf
+  notify: restart nginx
+  become: True
+  
+- name: set sepolicy for gunicorn
+  copy: src=nginx_gunicorn.sock.pp dest={{ ansible_env.HOME}}/nginx_gunicorn.sock.pp
+  become: True
+
+- name: apply SE policy
+  command: semodule -i {{ ansible_env.HOME}}/nginx_gunicorn.sock.pp
+  become: True
+
+- name: set httpd_read_user_content
+  seboolean: name=httpd_read_user_content state=yes persistent=yes
+  become: True
+
+- name: set chmod for HOME
+  file: path={{ ansible_env.HOME }} state=directory mode=0755
+  become: True
+   
+- name: set systemctl gunicorn.sock
+  template: src=gunicorn.socket.j2 dest={{ mezzanine_systemctl_path }}/gunicorn.socket
+  become: True
+  notify: start and enabled gunicorn service
+
+- name: set systemctl gunicorn.service
+  template: src=gunicorn.service.j2 dest={{ mezzanine_systemctl_path }}/gunicorn.service
+  become: True
+  notify: start and enabled gunicorn service
+
+- name: set the gunicorn config file
+  template: src=gunicorn.conf.py.j2 dest={{ mezzanine_proj_path }}/gunicorn.conf.py
